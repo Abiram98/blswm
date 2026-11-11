@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sparql-wm-bench"
 version = "0.1.0"
+description = "Standalone benchmark for learned, engine-agnostic workload management"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.23"]
 [project.optional-dependencies]

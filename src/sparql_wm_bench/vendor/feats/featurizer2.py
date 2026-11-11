@@ -586,7 +586,7 @@ class Featurizer2:
                 lit_freq_o = self._get_lit_scale_no_values()
                 lit_type_la = LiteralsFeaturizer.feat(node.object)
         
-        # Porting fix: unscaled statistics are scalars; concatenate requires vectors.
+        # Unscaled statistics are scalars; concatenate requires vectors.
         pred_freq = np.atleast_1d(pred_freq)
         pred_lits = np.atleast_1d(pred_lits)
         pred_ents = np.atleast_1d(pred_ents)

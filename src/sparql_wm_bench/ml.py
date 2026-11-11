@@ -1,7 +1,7 @@
 """Five PlanRGCN-based heads, one trainer and one checkpoint schema.
 
-RGCN embedding follows sqpp Classifier2RGCN; joint encoder follows JointDWNS.
-P+IconQ and joint RMSE are specification-derived additions.
+Two graph-convolution layers produce query embeddings for isolated,
+candidate-only, joint, and target-relative prediction.
 """
 import time
 import json
@@ -47,7 +47,7 @@ def network(config):
     return Model()
 
 def metadata(config):
-    return dict(schema_version=1,architecture=config,feature_schema='sqpp-Featurizer2-QueryGraph-13',
+    return dict(schema_version=1,architecture=config,feature_schema='logical-query-graph-13-v1',
                 thresholds=[config.get('class_threshold_s',120)],units='seconds' if config['model_type'].endswith('_reg') else 'class',
                 semantics='total_execution_runtime',normalization=None)
 

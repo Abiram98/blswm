@@ -1,20 +1,24 @@
-# Executed validation
+# Validation
 
-All commands ran from /blswm. Installation and test commands used local TMPDIR/cache/pycache settings documented in README.
+Run from the project root after setup:
 
-- `python -m venv --system-site-packages .venv`
-- `.venv/bin/pip install -e '.[test]'` — succeeded.
-- `.venv/bin/python -m pytest --basetemp=/blswm/.local/pytest-release2 -q` — 52 passed, including the separately marked Java integration test.
-- `MAVEN_OPTS=-Djava.io.tmpdir=/blswm/.local/tmp mvn -q -f java/qpe/pom.xml -Dmaven.repo.local=/blswm/.local/m2 -DskipTests package` — succeeded.
-- `.venv/bin/python examples/smoke.py` — four policies × two repeats × 350 offered occurrences, all successful synthetic executions.
-- `.venv/bin/sparql-wm-bench analyze --runs runs/smoke --out reports/smoke --plot` — succeeded after replacing the newer matplotlib `tick_labels` argument with supported `labels`.
-- `.venv/bin/python -m sparql_wm_bench --help` — succeeded.
-- `.venv/bin/python -m compileall -q src` — succeeded.
+```bash
+source .local/env.sh
+pytest tests/test_core.py tests/test_integration_offline.py tests/test_packaging.py
+python examples/smoke.py
+sparql-wm-bench analyze --runs runs/smoke --out reports/smoke
+```
 
-Initial test failures found simulator final-completion termination and missing graph dependency imports; these were corrected. The Java graph integration additionally found the source unscaled scalar concatenation bug, corrected in the port. Earlier failing runs are not counted as passing evidence.
+Core tests cover profiles, sampling, open-loop arrivals, admission rules, latency accounting, failure handling, protocol framing, HTTP full-result consumption, and output-path isolation. They require no database, Java, GPU, or trained checkpoint. The smoke workflow records 2,800 synthetic occurrences across four policies and two repeats.
 
-Source Git status was inspected before and after: sqpp stayed clean, and DWNet's pre-existing modified/untracked analysis files remained. No writes were intentionally made to source/data mounts. This is not a byte-for-byte filesystem checksum attestation: a complete pre-run checksum of all mounts was not captured.
+For model and graph tests:
 
-No original paper numerical experiment or external Virtuoso/GPU experiment was executed. Generated runs, figures, binaries, caches, environments and checkpoints are ignored by Git.
+```bash
+./setup.sh --ml --java
+source .local/env.sh
+pytest -q
+```
 
-Final smoke and CLI checks were rerun after setting IDs and predictor-error accounting were added. `run --catalog examples/catalog.json --trace examples/trace.csv --policy fifo --mpl 1 --synthetic-durations examples/durations.json --out runs/tiny` also succeeded.
+The full suite has 52 tests, including five CPU train/save/reload/predict paths and a separately marked Java graph-extraction integration test. The Java test uses synthetic statistics and requires the built JAR; it skips when the JAR is unavailable. An environment with the optional dependencies and JAR passed all 52 tests.
+
+Synthetic tests do not measure live engine performance. Each engine evaluation must validate result completeness, profiles, resource settings, checkpoint compatibility, and identical trace replay across policies. Preserve failed executions and reject incomplete or unmatched populations for paired analysis. GPU timing requires a compatible GPU environment and synchronized measurements.

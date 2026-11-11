@@ -1,4 +1,4 @@
-"""Portable adapter around the sqpp logical graph and Meta-KG featurizer."""
+"""Logical query-graph extraction and Meta-KG feature construction."""
 import json
 from pathlib import Path
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from .io import read, write
 
 def main(argv=None):
-    parser=argparse.ArgumentParser(description='Non-intrusive SPARQL workload benchmark')
+    parser=argparse.ArgumentParser(description='Standalone benchmark for learned, engine-agnostic workload management (SPARQL workloads)')
     sub=parser.add_subparsers(dest='command',required=True)
     def arguments(p, fields):
         for field in fields: p.add_argument('--'+field,required=True)
@@ -25,7 +25,7 @@ def main(argv=None):
             from .workloads import select,generate,save
             config=read(args.config)
             if (config.get('composition') or config.get('workload_id') in ('W2','D2')) and not args.exclude:
-                raise ValueError('This paper preset requires --exclude with the training-workload bag')
+                raise ValueError('This experiment preset requires --exclude with the training-workload bag')
             bag=select(load(args.catalog),config,read(args.exclude) if args.exclude else ())
             trace=generate(bag,config.get('pattern','P'),config.get('arrival_seed',1),config.get('mu',.6)); save(args.out,bag,trace,config)
         elif args.command=='run':
@@ -41,7 +41,7 @@ def main(argv=None):
                 predictor=Online(Loaded(args.model_dir,Graphs(read(args.graph_config))),catalog)
                 kind=predictor.loaded.config['model_type']
                 allowed={'rtq':('planrgcn_class','scqpp_class','bi_scqpp_class'),'sqa':('scqpp_class','bi_scqpp_class'),'rtq-reeval':('bi_scqpp_class',),'sqa-reeval':('bi_scqpp_class',),'iconq':('bi_scqpp_reg',),'rr':('planrgcn_class','scqpp_class','bi_scqpp_class')}
-                if args.policy in allowed and kind not in allowed[args.policy]: raise ValueError('Incompatible predictor for paper policy')
+                if args.policy in allowed and kind not in allowed[args.policy]: raise ValueError('Incompatible predictor for configured policy')
             elif not args.synthetic_durations and args.policy!='fifo':
                 raise ValueError('Real predictive policies require --model-dir; no implicit mock')
             run=replay(read(args.trace),catalog,Policy(args.policy,**config),predictor,executor=HTTPExecutor(args.endpoint) if args.endpoint else None,

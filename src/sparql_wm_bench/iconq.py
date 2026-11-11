@@ -1,6 +1,4 @@
-"""GreedyScheduler's policy, independent of SPARQL execution and model serving.
-
-Reference: /IconqSched/scheduler/greedy_scheduler.py, especially ingest_query.
+"""Greedy lookahead policy, independent of SPARQL execution and model serving.
 All runtime estimates here originate from the supplied predictor, never labels.
 """
 from __future__ import annotations
@@ -69,8 +67,8 @@ class IconQSchedPolicy:
         """One ordered set, one vector of total runtimes, including outgoing effects."""
         if hasattr(self.predictor, "predict_set"):
             return self.predictor.predict_set(candidate, running, at)
-        # Compatibility for scalar test fixtures and the historical DWNS adapter.
-        # Production uses QSPSRuntimePredictor, never this retargeting path.
+        # Scalar predictor support for test fixtures. The admission controller
+        # supplies joint predictions through predict_set.
         values = {candidate.query_id: self.predictor.predict(candidate.text, [r.text for r in running])}
         values.update({r.query_id: self.predictor.predict(
             r.text, [other.text for other in running if other.query_id != r.query_id] + [candidate.text])
@@ -116,7 +114,7 @@ class IconQSchedPolicy:
             return Decision(None, "concurrency_limit")
         for q in waiting:
             if q.baseline is None:
-                # Empty context replaces Stage's average-runtime estimate.
+                # Empty context estimates isolated runtime.
                 q.baseline = predict(q, [], now)[q.query_id]
         if cfg.ignore_short_running:
             for q in waiting:
@@ -126,8 +124,8 @@ class IconQSchedPolicy:
             q = min(waiting, key=lambda q: q.baseline)
             return Decision(q.query_id, "idle_shortest_query", q.baseline)
 
-        # The original real-execution branch extends imminent/overdue estimates
-        # with random jitter. Use a fixed factor close to its mean for reproducibility.
+        # Extend imminent or overdue finish estimates with a fixed factor
+        # for deterministic lookahead.
         for r in running:
             if r.finish_at < now + cfg.future_wait_floor:
                 r.finish_at = now + cfg.overrun_extension_factor * r.predicted_runtime
