@@ -1,0 +1,180 @@
+{
+  "fig3": {
+    "workloads": [
+      "W1",
+      "W2",
+      "D1",
+      "D2"
+    ],
+    "rates": [
+      0.6,
+      1.0
+    ],
+    "patterns": [
+      "P"
+    ],
+    "settings": [
+      {
+        "policy": "fifo",
+        "mpl": 1
+      },
+      {
+        "policy": "fifo",
+        "mpl": 5
+      },
+      {
+        "policy": "fifo",
+        "mpl": 10
+      },
+      {
+        "policy": "rr",
+        "mpl": 10,
+        "predictor": "planrgcn_class"
+      },
+      {
+        "policy": "rtq",
+        "mpl": 10,
+        "predictor": "planrgcn_class"
+      },
+      {
+        "policy": "rtq",
+        "mpl": 10,
+        "predictor": "scqpp_class"
+      },
+      {
+        "policy": "rtq",
+        "mpl": 10,
+        "predictor": "bi_scqpp_class"
+      },
+      {
+        "policy": "sqa",
+        "mpl": 10,
+        "predictor": "scqpp_class"
+      },
+      {
+        "policy": "sqa",
+        "mpl": 10,
+        "predictor": "bi_scqpp_class"
+      },
+      {
+        "policy": "rtq-reeval",
+        "mpl": 10,
+        "predictor": "bi_scqpp_class"
+      },
+      {
+        "policy": "sqa-reeval",
+        "mpl": 10,
+        "predictor": "bi_scqpp_class"
+      },
+      {
+        "policy": "iconq",
+        "mpl": 10,
+        "predictor": "bi_scqpp_reg"
+      }
+    ],
+    "repeats": 2
+  },
+  "fig4": {
+    "presets": [
+      "configs/paper/dbpedia_cpu-demanding_lf.json",
+      "configs/paper/dbpedia_cpu-demanding_p.json",
+      "configs/paper/dbpedia_cpu-demanding_par.json",
+      "configs/paper/dbpedia_cpu-demanding_rcb.json",
+      "configs/paper/dbpedia_heterogeneous_lf.json",
+      "configs/paper/dbpedia_heterogeneous_p.json",
+      "configs/paper/dbpedia_heterogeneous_par.json",
+      "configs/paper/dbpedia_heterogeneous_rcb.json",
+      "configs/paper/dbpedia_homogeneous_p.json",
+      "configs/paper/dbpedia_homogeneous_par.json",
+      "configs/paper/dbpedia_long-running_lf.json",
+      "configs/paper/dbpedia_long-running_p.json",
+      "configs/paper/dbpedia_long-running_par.json",
+      "configs/paper/dbpedia_runtime-skewed_lf.json",
+      "configs/paper/dbpedia_runtime-skewed_p.json",
+      "configs/paper/dbpedia_runtime-skewed_par.json",
+      "configs/paper/wikidata_cpu-demanding_lf.json",
+      "configs/paper/wikidata_cpu-demanding_p.json",
+      "configs/paper/wikidata_cpu-demanding_par.json",
+      "configs/paper/wikidata_cpu-demanding_rcb.json",
+      "configs/paper/wikidata_heterogeneous_lf.json",
+      "configs/paper/wikidata_heterogeneous_p.json",
+      "configs/paper/wikidata_heterogeneous_par.json",
+      "configs/paper/wikidata_heterogeneous_rcb.json",
+      "configs/paper/wikidata_homogeneous_p.json",
+      "configs/paper/wikidata_homogeneous_par.json",
+      "configs/paper/wikidata_long-running_lf.json",
+      "configs/paper/wikidata_long-running_p.json",
+      "configs/paper/wikidata_long-running_par.json",
+      "configs/paper/wikidata_runtime-skewed_lf.json",
+      "configs/paper/wikidata_runtime-skewed_p.json",
+      "configs/paper/wikidata_runtime-skewed_par.json"
+    ],
+    "settings": [
+      {
+        "policy": "fifo",
+        "mpl": 10
+      },
+      {
+        "policy": "rtq",
+        "mpl": 10,
+        "predictor": "bi_scqpp_class"
+      },
+      {
+        "policy": "iconq",
+        "mpl": 10,
+        "predictor": "bi_scqpp_reg"
+      }
+    ],
+    "repeats": 2
+  },
+  "fig5": [
+    {
+      "dataset": "dbpedia",
+      "composition": "Heterogeneous",
+      "pattern": "RCB"
+    },
+    {
+      "dataset": "wikidata",
+      "composition": "Heterogeneous",
+      "pattern": "LF"
+    },
+    {
+      "dataset": "wikidata",
+      "composition": "Long-running",
+      "pattern": "LF"
+    }
+  ],
+  "tableV": {
+    "workloads": [
+      "D2",
+      "W2"
+    ],
+    "predictors": [
+      "bi_scqpp_class",
+      "scqpp_class",
+      "p_iconq_class",
+      "planrgcn_class"
+    ],
+    "mpl": [
+      1,
+      5,
+      10
+    ],
+    "repeats": 3
+  },
+  "fig6": {
+    "running": [
+      0,
+      5,
+      10
+    ],
+    "waiting": [
+      2,
+      5,
+      10,
+      20,
+      50
+    ],
+    "repeats": 10
+  }
+}

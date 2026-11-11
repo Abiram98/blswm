@@ -1,0 +1,17 @@
+{
+  "dataset": "dbpedia",
+  "composition": "Homogeneous",
+  "pattern": "P",
+  "mu": 0.6,
+  "selection_seed": 1,
+  "arrival_seed": 2,
+  "reuse": false,
+  "counts": {
+    "S": 0,
+    "M": 350,
+    "L": 0,
+    "L100": 0,
+    "HM": 0,
+    "HL": 0
+  }
+}

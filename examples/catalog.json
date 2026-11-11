@@ -1,0 +1,5 @@
+[
+  {"query_id":"q1","query_text":"SELECT * WHERE { ?s <urn:p1> ?o }", "dataset":"synthetic", "isolated_runtime_s":1.0,"peak_cpu_pct":100},
+  {"query_id":"q2","query_text":"SELECT * WHERE { ?s <urn:p2> ?o }", "dataset":"synthetic", "isolated_runtime_s":2.0,"peak_cpu_pct":150},
+  {"query_id":"q3","query_text":"SELECT * WHERE { ?s <urn:p3> ?o }", "dataset":"synthetic", "isolated_runtime_s":3.0,"peak_cpu_pct":201}
+]

@@ -1,0 +1,5 @@
+occurrence_id,query_id,arrival_s,trace_index
+o1,q1,0.0,0
+o2,q2,0.1,1
+o3,q1,0.2,2
+o4,q3,0.3,3

@@ -1,0 +1,17 @@
+{
+  "dataset": "dbpedia",
+  "composition": "Runtime-skewed",
+  "pattern": "LF",
+  "mu": 0.6,
+  "selection_seed": 1,
+  "arrival_seed": 2,
+  "reuse": false,
+  "counts": {
+    "S": 0,
+    "M": 280,
+    "L": 60,
+    "L100": 10,
+    "HM": 0,
+    "HL": 0
+  }
+}
