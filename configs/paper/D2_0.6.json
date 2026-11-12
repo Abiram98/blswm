@@ -1,9 +1,0 @@
-{
-  "dataset": "dbpedia",
-  "workload_id": "D2",
-  "pattern": "P",
-  "mu": 0.6,
-  "selection_seed": 2,
-  "arrival_seed": 3,
-  "reuse": false
-}

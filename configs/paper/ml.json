@@ -1,8 +1,0 @@
-{
-  "model_type": "bi_scqpp_class",
-  "in_dim": 128,
-  "hidden_dim": 128,
-  "epochs": 10,
-  "seed": 1,
-  "device": "cpu"
-}

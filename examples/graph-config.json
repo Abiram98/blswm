@@ -1,7 +1,0 @@
-{
-  "jar": "java/qpe/target/qpe-1.0-SNAPSHOT.jar",
-  "pred_stat_path": "/data/meta-kg/predicate",
-  "ent_path": "/data/meta-kg/entity",
-  "bins": 10,
-  "scaling": "binner"
-}

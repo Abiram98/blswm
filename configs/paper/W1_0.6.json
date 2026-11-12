@@ -1,9 +1,0 @@
-{
-  "dataset": "wikidata",
-  "workload_id": "W1",
-  "pattern": "P",
-  "mu": 0.6,
-  "selection_seed": 1,
-  "arrival_seed": 3,
-  "reuse": false
-}

@@ -6,13 +6,14 @@ name = "sparql-wm-bench"
 version = "0.1.0"
 description = "Standalone benchmark for learned, engine-agnostic workload management"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.23"]
+dependencies = ["numpy>=1.23", "pandas>=1.5"]
 [project.optional-dependencies]
 test = ["pytest>=7"]
-plot = ["matplotlib>=3.6"]
 ml = ["torch", "dgl", "jpype1", "networkx", "pandas", "scikit-learn", "scipy"]
 [project.scripts]
-sparql-wm-bench = "sparql_wm_bench.cli:main"
+policies = "policies.cli:main"
+qpp = "qpp.cli:main"
+wrk-gen = "wrk_gen.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 [tool.pytest.ini_options]

@@ -1,0 +1,116 @@
+{
+  "source": "data/test_wkl",
+  "selection": "Profile runtime and maximum observed live execution both below 30 seconds",
+  "query_count": 14,
+  "limit_seconds": 30,
+  "original_arrivals_preserved": true,
+  "observations_from": [
+    "/data/temp/wkl_temp/rtq-reeval/run.json",
+    "/data/temp/wkl_temp/sqa-reeval/run.json",
+    "/data/temp/wkl_temp/iconqshed_e2e/iconqshed/run.json",
+    "/data/temp/wkl_temp/readme_cli_e2e/fifo/run.json",
+    "/data/temp/wkl_temp/readme_cli_e2e/rtq/run.json",
+    "/data/temp/wkl_temp/readme_cli_e2e/rtq-reeval/run.json",
+    "/data/temp/wkl_temp/readme_cli_e2e/sqa/run.json"
+  ],
+  "queries": [
+    {
+      "query_id": "het_2__occurrence_000134",
+      "original_query_no": 1,
+      "new_query_no": 1,
+      "profile_runtime_s": 1.6215507127344608,
+      "maximum_observed_runtime_s": 2.513389378786087
+    },
+    {
+      "query_id": "het_2__occurrence_000306",
+      "original_query_no": 2,
+      "new_query_no": 2,
+      "profile_runtime_s": 2.415818454697728,
+      "maximum_observed_runtime_s": 3.0425854474306107
+    },
+    {
+      "query_id": "het_2__occurrence_000086",
+      "original_query_no": 3,
+      "new_query_no": 3,
+      "profile_runtime_s": 17.18387229926884,
+      "maximum_observed_runtime_s": 22.680373072624207
+    },
+    {
+      "query_id": "het_2__occurrence_000237",
+      "original_query_no": 4,
+      "new_query_no": 4,
+      "profile_runtime_s": 1.6627496238797903,
+      "maximum_observed_runtime_s": 2.0382526963949203
+    },
+    {
+      "query_id": "het_2__occurrence_000154",
+      "original_query_no": 6,
+      "new_query_no": 5,
+      "profile_runtime_s": 3.9646573457866903,
+      "maximum_observed_runtime_s": 4.176649555563927
+    },
+    {
+      "query_id": "het_2__occurrence_000266",
+      "original_query_no": 8,
+      "new_query_no": 6,
+      "profile_runtime_s": 1.920291647315025,
+      "maximum_observed_runtime_s": 2.034234404563904
+    },
+    {
+      "query_id": "het_2__occurrence_000168",
+      "original_query_no": 9,
+      "new_query_no": 7,
+      "profile_runtime_s": 4.316766396164894,
+      "maximum_observed_runtime_s": 4.511560268700123
+    },
+    {
+      "query_id": "het_2__occurrence_000290",
+      "original_query_no": 10,
+      "new_query_no": 8,
+      "profile_runtime_s": 1.1202119812369349,
+      "maximum_observed_runtime_s": 0.009257197380065918
+    },
+    {
+      "query_id": "het_2__occurrence_000121",
+      "original_query_no": 11,
+      "new_query_no": 9,
+      "profile_runtime_s": 3.2659561913460493,
+      "maximum_observed_runtime_s": 6.11153195053339
+    },
+    {
+      "query_id": "het_2__occurrence_000253",
+      "original_query_no": 12,
+      "new_query_no": 10,
+      "profile_runtime_s": 9.418382547795773,
+      "maximum_observed_runtime_s": 16.070259176194668
+    },
+    {
+      "query_id": "het_2__occurrence_000156",
+      "original_query_no": 13,
+      "new_query_no": 11,
+      "profile_runtime_s": 9.240129660815,
+      "maximum_observed_runtime_s": 17.47266361117363
+    },
+    {
+      "query_id": "het_2__occurrence_000036",
+      "original_query_no": 15,
+      "new_query_no": 12,
+      "profile_runtime_s": 3.2438049614429474,
+      "maximum_observed_runtime_s": 3.269946940243244
+    },
+    {
+      "query_id": "het_2__occurrence_000277",
+      "original_query_no": 17,
+      "new_query_no": 13,
+      "profile_runtime_s": 2.4744668286293745,
+      "maximum_observed_runtime_s": 2.6704118624329567
+    },
+    {
+      "query_id": "het_2__occurrence_000308",
+      "original_query_no": 18,
+      "new_query_no": 14,
+      "profile_runtime_s": 1.6608614902943373,
+      "maximum_observed_runtime_s": 3.171417683362961
+    }
+  ]
+}

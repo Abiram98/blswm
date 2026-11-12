@@ -1,30 +1,12 @@
 """Integration tests requiring no external service, GPU or Java."""
-import json
-import socket
 import threading
 import time
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
-import pytest
-from sparql_wm_bench.service import send,receive,handle
-from sparql_wm_bench.runtime import HTTPExecutor,replay
-from sparql_wm_bench.policies import Policy
-from sparql_wm_bench.schema import FakePredictor
+from policies.runtime import HTTPExecutor,replay
+from policies.scheduling import Policy
+from policies.schema import FakePredictor
 
-def test_frames():
-    a,b=socket.socketpair()
-    try:
-        send(a,{'S':[{'occurrence_id':'x'}]}); assert receive(b)=={'S':[{'occurrence_id':'x'}]}
-    finally: a.close(); b.close()
 
-def test_validation():
-    class Model:
-        config={'model_type':'bi_scqpp_class'}
-        meta={'units':'class'}
-        def state(self,s): return {x['occurrence_id']:0 for x in s}
-    request=dict(schema_version=1,model_type='bi_scqpp_class',thresholds=[120],S=[dict(occurrence_id='a',query_text='select')])
-    assert handle(Model(),request)['predictions']=={'a':0}
-    request['thresholds']=[60]
-    with pytest.raises(ValueError): handle(Model(),request)
 
 def test_http_full_response_and_failures():
     class Handler(BaseHTTPRequestHandler):

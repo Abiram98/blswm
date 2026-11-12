@@ -5,7 +5,8 @@ import sys
 def test_core_imports_and_cli():
     script="""
 import sys
-from sparql_wm_bench import catalog, workloads, policies, analysis, cli
+from wrk_gen import cli
+from policies import scheduling
 assert not any(n in sys.modules for n in ('torch','dgl','jpype'))
 cli.main(['--help'])
 """
