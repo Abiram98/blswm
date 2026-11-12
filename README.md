@@ -1,7 +1,7 @@
-# Workload-management benchmark
+# Non-intrusive Learned SPARQL Workload Management Benchmark
 
 A standalone benchmark for evaluating learned, engine-agnostic workload management. 
-Compare scheduling policies and runtime predictors using fixed arrival traces, recorded executions, and paired metrics. 
+The goal with this benchmark is to compare scheduling policies and runtime predictors using different workload compositions. 
 Python 3.10+ is required.
 
 The implementation has three self-contained modules:
@@ -288,9 +288,6 @@ python -m wrk_gen arrivals --bag /data/temp/wiki_qc/bag \
 
 To reproduce a dataset scenario, pass its JSON file with `--scenario /path/to/P2/config.json` instead of supplying individual options. 
 Both a standalone scenario object and the saved `{"scenario": ...}` wrapper are accepted. 
-Explicit CLI options override its settings. 
-P2 defaults to `H_M` and P3 to `V100`. 
-Select different groups explicitly when needed. 
 Burst endpoints span the requested window. 
 The gap into each phase follows the preceding phase's arrival assignment, where the first arrival uses an initial gap unless `--first-arrival zero` is given.
 
