@@ -9,6 +9,7 @@ requires-python = ">=3.10"
 dependencies = ["numpy>=1.23", "pandas>=1.5"]
 [project.optional-dependencies]
 test = ["pytest>=7"]
+tune = ["ray[tune]>=2.52,<3"]
 ml = ["torch", "dgl", "jpype1", "networkx", "pandas", "scikit-learn", "scipy"]
 [project.scripts]
 policies = "policies.cli:main"
@@ -16,6 +17,7 @@ qpp = "qpp.cli:main"
 wrk-gen = "wrk_gen.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
+namespaces = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["integration: external services or graph toolchain required"]

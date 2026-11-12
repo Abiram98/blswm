@@ -23,7 +23,7 @@ def load_featurizer(path):
 class GraphCache:
     def __init__(self, featurizer, jar=None):
         self.featurizer = featurizer
-        self.jar = Path(jar or os.environ.get('QG_JAR', 'java/qpe/target/qpe-1.0-SNAPSHOT.jar')).resolve()
+        self.jar = Path(jar or os.environ.get('QG_JAR', 'src/qpp/java/qpe/target/qpe-1.0-SNAPSHOT.jar')).resolve()
         self.cache = {}
 
     def __call__(self, item):
@@ -36,7 +36,7 @@ class GraphCache:
             else:
                 import jpype
                 if not self.jar.is_file():
-                    raise ValueError(f'Query graph JAR missing: {self.jar}; build java/qpe or supply --jar')
+                    raise ValueError(f'Query graph JAR missing: {self.jar}; build src/qpp/java/qpe or supply --jar')
                 if not jpype.isJVMStarted():
                     jpype.startJVM(classpath=[str(self.jar)])
                 raw = json.loads(str(jpype.JClass('com.org.ex_plan.QueryGraphVisitor2').QGCreate(text)))

@@ -83,3 +83,62 @@ class Predictor:
                             probabilities={str(i): p for i, p in enumerate(values)})
             predictions.append(item)
         return dict(self.info(), sample_id=request.get('sample_id'), predictions=predictions)
+
+
+class TrainedPredictor:
+    """Serve checkpoints produced by qpp fit and tune."""
+    def __init__(self, model_dir, device='cpu', jar=None):
+        import torch
+        from .architectures import PerformanceModel
+        from .graphs import GraphCache, load_featurizer
+        self.directory=Path(model_dir).resolve()
+        checkpoint=torch.load(self.directory/'best_model.pt',map_location='cpu',weights_only=False)
+        self.dimensions=checkpoint['architecture'];self.kind=self.dimensions['model_type']
+        self.thresholds=checkpoint['thresholds'];self.task=checkpoint['task']
+        self.device=torch.device(device)
+        self.model=PerformanceModel(**self.dimensions).to(self.device)
+        self.model.load_state_dict(checkpoint['model_state'],strict=True);self.model.eval()
+        self.graphs=GraphCache(load_featurizer(self.directory/'featurizer.pickle'),jar)
+        self.lock=threading.Lock()
+
+    def info(self):
+        joint=self.kind not in ('planrgcn','dwns')
+        return dict(status='ok',protocol_version=VERSION,model_type=self.kind,
+                    prediction_task=self.task,prediction_unit='seconds' if self.task=='regression' else 'class_index',
+                    runtime_semantics='total_runtime' if self.task=='regression' else 'runtime_interval',
+                    output_dim=1 if self.task=='regression' else len(self.thresholds)+1,
+                    runtime_thresholds=self.thresholds,num_classes=len(self.thresholds)+1 if self.task=='classification' else None,
+                    model_variant=self.kind,dimensions=self.dimensions,device=str(self.device),
+                    supports_query_set_prediction=True,returns_per_query_predictions=joint)
+
+    def predict(self, request):
+        import dgl,torch
+        queries=normalize(request.get('queries'))
+        indices=list(range(len(queries)))
+        if self.kind in ('planrgcn','dwns'):
+            indices=[i for i,q in enumerate(queries) if q['role']=='candidate']
+            if len(indices)!=1:raise ValueError('Candidate-only models require one candidate')
+            if self.kind=='dwns' and indices[0]!=len(queries)-1:raise ValueError('DWNS candidate must follow running queries')
+        with self.lock,torch.inference_mode():
+            graph_queries=[queries[i] for i in indices] if self.kind=='planrgcn' else queries
+            graphs=dgl.batch([self.graphs(q) for q in graph_queries]).to(self.device)
+            logits=self.model(graphs,graph_queries)
+            if self.kind!='planrgcn':logits=logits[indices]
+            outputs=(logits if self.task=='regression' else logits.softmax(-1)).cpu().tolist()
+        predictions=[]
+        for index,values in zip(indices,outputs):
+            if any(not math.isfinite(x) for x in values):raise ValueError('Model produced nonfinite predictions')
+            q=queries[index];item=dict(query_id=q['query_id'],input_index=q['input_index'],position=q['pos'],role=q['role'])
+            if self.task=='regression':item['predicted_runtime_seconds']=values[0]
+            else:
+                label=max(range(len(values)),key=values.__getitem__)
+                item.update(predicted_class=label,confidence=values[label],probabilities={str(i):p for i,p in enumerate(values)})
+            predictions.append(item)
+        return dict(self.info(),sample_id=request.get('sample_id'),predictions=predictions)
+
+
+def load_predictor(model_dir, device='cpu', jar=None):
+    import torch
+    checkpoint=torch.load(Path(model_dir)/'best_model.pt',map_location='cpu',weights_only=False)
+    cls=TrainedPredictor if 'architecture' in checkpoint else Predictor
+    return cls(model_dir,device,jar)

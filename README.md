@@ -61,7 +61,7 @@ python -m qpp serve \
   --host 127.0.0.1 --port 9011 --device cpu
 ```
 
-Both servers use the local `java/qpe/target/qpe-1.0-SNAPSHOT.jar`; override with `--jar` if needed.
+Both servers use the local `src/qpp/java/qpe/target/qpe-1.0-SNAPSHOT.jar`; override with `--jar` if needed.
 
 ## Policy execution
 
@@ -156,7 +156,97 @@ python -m policies iconqshed \
 
 See each command's `--help` for additional options. The earlier `python -m policies --policy <policy> ...` syntax remains supported.
 
+## Build CQPP datasets
+
+The dataset builder converts completed **FIFO** workload executions into training data. Run from the repository root after `source .local/env.sh`. First execute the workload; use the same workload directory when building the dataset:
+
+```bash
+python -m policies fifo \
+  --workload-dir data/test_wkl_short \
+  --endpoint http://wikidata_virtuoso:8890/sparql \
+  --query-timeout 30 --mpl 5 --out runs/dataset_fifo
+```
+
+Pass one or more completed run directories through `--runs`. Each must belong to the supplied workload. Repeat the FIFO command with different `--out` directories to collect more runs or MPL settings. The builder reads the workload's `ql.csv` and each run's `run.json`. It uses recorded admission and completion times to identify the queries running at each decision.
+
+### Incoming-query datasets: DWNS and PlanRGCN
+
+Use `--format candidate` when the model predicts the incoming query's performance. DWNS receives the running queries as context; PlanRGCN receives the incoming query alone.
+
+```bash
+python -m qpp dataset --workload data/test_wkl_short \
+  --runs runs/dataset_fifo --format candidate --split train_validation \
+  --validation-fraction 0.2 --threshold 120 --seed 42 \
+  --out /data/temp/wkl_temp/candidate_trainval
+python -m qpp dataset --workload /path/to/test_workload \
+  --runs runs/test_fifo_1 runs/test_fifo_2 --format candidate --split test \
+  --threshold 120 --out /data/temp/wkl_temp/candidate_test
+```
+
+The training command writes `train.csv` and `val.csv` for DWNS, and `planrgcn_train.tsv` and `planrgcn_validation.tsv` for PlanRGCN. The test command combines all supplied runs into `test.csv` and `planrgcn_test.tsv`. CSV columns follow the incoming-query dataset format, including `Execution_Time`, `Running_Queries_At_Start` and `Queries_Started_During`. Set `RUNTIME_COL_NAME=Execution_Time` for the DWNS reader; the PlanRGCN TSV uses `mean_latency`. Start and end times are seconds relative to the run start. Resource measurements, query file names and measurement-coverage flags are blank when unavailable.
+
+### Joint query-set datasets: QSPS and IconQShed models
+
+Use `--format queryset` when the model predicts performance for the candidate and running queries. Each JSONL state contains query texts, roles, elapsed times, aligned class labels in `y`, and observed runtimes in seconds for regression.
+
+```bash
+python -m qpp dataset --workload data/test_wkl_short \
+  --runs runs/dataset_fifo --format queryset --split train_validation \
+  --validation-fraction 0.2 --sample-mode all_query_start_events \
+  --threshold 120 --seed 42 --out /data/temp/wkl_temp/queryset_trainval
+python -m qpp dataset --workload /path/to/test_workload \
+  --runs runs/test_fifo_1 runs/test_fifo_2 --format queryset --split test \
+  --sample-mode all_query_start_events --threshold 120 \
+  --out /data/temp/wkl_temp/queryset_test
+```
+
+The training command writes `train.jsonl` and `validation.jsonl`; the test command combines the supplied runs into `test.jsonl`. `--sample-mode all_query_start_events` samples each query start. `all_decision_events` also samples completions, and `aligned_hard_prefix` selects comparable cumulative hard-query cutpoints across runs. A single short trace may have only one hard-prefix value and therefore too few groups for a train/validation split; use multiple traces or start-event sampling.
+
+### Split and labeling settings
+
+`--threshold` sets the binary class boundary in seconds; measured runtimes remain available for regression. `--validation-fraction` and `--seed` configure the training/validation split. Candidate datasets group repeated candidate query texts together; query-set datasets group by decision cutpoint. The builder chooses the least query-text overlap among 512 seeded candidate splits and records remaining context overlap, input hashes and sample counts in `manifest.json`. Check that overlap before training. This heuristic does not reproduce the saved datasets' complete stratification or split optimization.
+
+For held-out evaluation, supply an independent test workload and its FIFO runs. The test command does not automatically check overlap against training data. Every `--out` must be a new directory.
+
 ## Model training and evaluation
+
+
+```bash
+python -m qpp fit --model-type qsps \
+  --data /data/temp/wkl_temp/queryset_trainval/train.jsonl \
+  --validation /data/temp/wkl_temp/queryset_trainval/validation.jsonl \
+  --featurizer /data/models/cqpp_wrk/queryset_cqpp_dataset_w1/run_queryset_joint_dwns_base_120/featurizer.pickle \
+  --init-checkpoint /data/models/cqpp_wrk/queryset_cqpp_dataset_w1/run_queryset_joint_dwns_base_120/best_model.pt \
+  --hidden-dim1 512 --hidden-dim2 128 --lstm-hidden-dim 64 --lstm-num-layers 2 \
+  --thresholds 120 --epochs 10 --lr 0.001 --device cpu \
+  --out models/qsps
+```
+
+To fit features from local knowledge-graph statistics instead, create a featurizer and pass its `featurizer.pickle` to `qpp fit` or `qpp tune`:
+
+```bash
+python -m qpp featurizer --predicate-stats /path/to/predicate_stats \
+  --entity-stats /path/to/entity_stats --literal-stats /path/to/literal_stats \
+  --bins 10 --scaling binner --out models/graph_features
+```
+
+Each statistics directory needs a `freq` subdirectory containing SPARQL-result JSON files. Binned features also require predicate `ents`/`lits` and entity `subj`/`obj` directories with their respective counts. Omit `--literal-stats` if unavailable. The output manifest records input hashes.
+
+Omit `--init-checkpoint` to initialize a new model from scratch.
+
+For Ray Tune, install the optional dependency with `./setup.sh --ml --tune --java`. `qpp tune` uses the same model and training options plus a JSON search space, seeded random selection, ASHA scheduling and explicit trial resources; it uses the chosen validation selection metric. The best checkpoint and featurizer are saved in the output directory alongside trial results. `best_selection_score` is validation loss, or `1 - macro_f1` when selecting macro-F1; lower is better. Edit `configs/qpp/search.json` to choose candidate values, including optional `feature_bins` and `feature_scaling` (`binner` or `none`); do not vary dimensions when initializing from a fixed-shape checkpoint. Use `--gpus-per-trial` and `--device cuda` when allocating GPUs.
+
+```bash
+python -m qpp tune --model-type qsps \
+  --data /data/temp/wkl_temp/queryset_trainval/train.jsonl \
+  --validation /data/temp/wkl_temp/queryset_trainval/validation.jsonl \
+  --featurizer /data/models/cqpp_wrk/queryset_cqpp_dataset_w1/run_queryset_joint_dwns_base_120/featurizer.pickle \
+  --search configs/qpp/search.json --samples 4 --cpus 2 \
+  --cpus-per-trial 1 --max-concurrent-trials 2 \
+  --epochs 10 --device cpu --out models/qsps_tuned
+```
+
+The existing `qpp train` command fine-tunes a compatible joint CQPP checkpoint directly:
 
 Initialize from a trusted model directory and provide separate JSONL training/validation files:
 
@@ -168,7 +258,6 @@ python -m qpp evaluate --model-dir models/cqpp \
   --data /path/to/test.jsonl --out reports/cqpp.json
 ```
 
-Rows contain `S` with inline `query_text`, plus aligned class labels in `y`. Regression targets use each query's `observed_runtime` or an aligned `y_runtime` array, in seconds. Classification reports cross-entropy, accuracy and macro F1; regression reports RMSE and MAE. Only load trusted checkpoint/pickle artifacts.
 
 ## Query-log characterization and workload generation
 

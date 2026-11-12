@@ -7,7 +7,6 @@ from policies.scheduling import Policy
 from policies.schema import FakePredictor
 
 
-
 def test_http_full_response_and_failures():
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):

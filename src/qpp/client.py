@@ -20,7 +20,7 @@ class RemotePredictor:
     def _check(self, response):
         common = (response.get('protocol_version') == VERSION
                   and response.get('prediction_task') == self.task
-                  and response.get('returns_per_query_predictions') is True)
+                  and type(response.get('returns_per_query_predictions')) is bool)
         if self.task == 'regression':
             valid = (response.get('prediction_unit') == 'seconds'
                      and response.get('runtime_semantics') == 'total_runtime'
@@ -34,6 +34,8 @@ class RemotePredictor:
             raise ValueError(f'Predictor {self.task} contract mismatch')
 
     def predict_joint(self, candidate, running, now):
+        if not self.metadata['returns_per_query_predictions']:
+            raise ValueError('Running-query reevaluation requires a joint predictor')
         active = sorted(running, key=lambda r: (r.admission_s, r.occurrence.trace_index))
         queries = [dict(query_id=r.occurrence.occurrence_id, query_text=self.texts[r.occurrence.query_id],
                         role='running', pos=i, elapsed_at_decision=max(0., now-r.admission_s))
@@ -73,4 +75,24 @@ class RemotePredictor:
         return values
 
     def predict(self, candidate, running=(), now=0.):
-        return self.predict_joint(candidate, running, now)[candidate.occurrence_id]
+        if self.metadata['returns_per_query_predictions']:
+            return self.predict_joint(candidate, running, now)[candidate.occurrence_id]
+        active=sorted(running,key=lambda r:(r.admission_s,r.occurrence.trace_index))
+        queries=[dict(query_id=r.occurrence.occurrence_id,query_text=self.texts[r.occurrence.query_id],
+                      role='running',pos=i,elapsed_at_decision=max(0.,now-r.admission_s)) for i,r in enumerate(active)]
+        queries.append(dict(query_id=candidate.occurrence_id,query_text=self.texts[candidate.query_id],
+                            role='candidate',pos=len(queries),elapsed_at_decision=0.))
+        response=self._request(dict(type='predict',queries=queries));self._check(response)
+        predictions=response.get('predictions')
+        if not isinstance(predictions,list) or len(predictions)!=1:raise ValueError('Candidate predictor returned invalid output')
+        item=predictions[0]
+        if item.get('query_id')!=candidate.occurrence_id or item.get('input_index')!=len(queries)-1:
+            raise ValueError('Candidate prediction identity mismatch')
+        value=item.get('predicted_class')
+        probs=item.get('probabilities',{})
+        if (isinstance(value,bool) or not isinstance(value,int) or not 0<=value<=len(self.thresholds)
+                or set(probs)!={str(i) for i in range(len(self.thresholds)+1)}
+                or any(not math.isfinite(float(p)) or not 0<=float(p)<=1 for p in probs.values())
+                or not math.isclose(sum(probs.values()),1.,abs_tol=1e-5)):
+            raise ValueError('Invalid candidate class probabilities')
+        return value

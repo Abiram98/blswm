@@ -16,5 +16,5 @@ models/
 *.jar
 *.log
 .env
-java/**/target/
-java/**/dependency-reduced-pom.xml
+src/qpp/java/qpe/target/
+src/qpp/java/qpe/dependency-reduced-pom.xml

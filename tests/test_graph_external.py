@@ -3,8 +3,8 @@ import pytest
 
 @pytest.mark.integration
 def test_java_graph(tmp_path):
-    jar=Path('java/qpe/target/qpe-1.0-SNAPSHOT.jar').resolve()
-    if not jar.exists(): pytest.skip('Build java/qpe first')
+    jar=Path('src/qpp/java/qpe/target/qpe-1.0-SNAPSHOT.jar').resolve()
+    if not jar.exists(): pytest.skip('Build src/qpp/java/qpe first')
     from qpp.graphs import GraphCache
     from qpp.features.feats.featurizer2 import Featurizer2
     for key in ('pred','ent'): (tmp_path/key/'freq').mkdir(parents=True)

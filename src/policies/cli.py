@@ -112,6 +112,8 @@ def main(argv=None):
             from qpp.client import RemotePredictor
             predictor = RemotePredictor(catalog, args.predictor_host, args.predictor_port,
                                         args.predictor_timeout, (args.threshold_seconds,), task=policy.prediction_task)
+            if args.policy in ('rtq-reeval','sqa-reeval','iconq','iconqshed') and not predictor.metadata['returns_per_query_predictions']:
+                raise ValueError('This policy requires a predictor for running queries')
         destination.mkdir(parents=True, exist_ok=False)
         result = replay(trace, catalog, policy, predictor,
                         executor=HTTPExecutor(args.endpoint, args.query_timeout), run_id=args.run_id)

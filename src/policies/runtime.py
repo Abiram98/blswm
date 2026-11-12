@@ -1,4 +1,4 @@
-"""Open-loop replay with a single controller and injected executors/clocks."""
+"""Open-loop replay with a single controller and measured HTTP execution."""
 import copy
 import math
 import time
@@ -91,6 +91,7 @@ def replay(trace, catalog, policy, predictor, *, executor, run_id='run1'):
         return (clock(), status, error)
 
     def complete(r, end, status='success', error=None):
+        # Pending executions retain admission snapshots; reevaluation updates the running record.
         r = next((active for active in running if active.occurrence.occurrence_id == r.occurrence.occurrence_id))
         o = r.occurrence
         results.append(dict(run_id=run_id, policy=policy.name, occurrence_id=o.occurrence_id, query_id=o.query_id, scheduled_arrival=o.arrival_s, arrival_s=o.arrival_s, admission_s=r.admission_s, completion_s=end, wait_s=r.admission_s - o.arrival_s, execution_s=end - r.admission_s, latency_s=end - o.arrival_s, status=status, error=error, dataset=metadata.get('dataset'), workload=metadata.get('workload'), scenario=metadata.get('scenario'), slot=r.slot, cost=r.cost, prediction=r.prediction, admission_cost=admission_values[o.occurrence_id]['cost'], admission_prediction=admission_values[o.occurrence_id]['prediction']))
@@ -132,6 +133,7 @@ def replay(trace, catalog, policy, predictor, *, executor, run_id='run1'):
             proposed_state = copy.deepcopy(state)
             d = policy.decide(tuple(waiting), tuple(running), now, measured, proposed_state)
             now = clock()
+            # Inference may span completions; reconcile them before committing a decision.
             stale = any((entry[0].done() for entry in pending))
             admitted = d.occurrence.occurrence_id if d and (not stale) else None
             decisions.append(dict(time_s=now, duration_s=now - started, waiting=len(waiting), running=len(running), admitted=admitted, committed=not stale, details=proposed_state.pop('decision_details', {})))
