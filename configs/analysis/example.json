@@ -1,0 +1,6 @@
+{
+  "configs": [
+    {"display_name": "FIFO", "run_path": ["../../runs/fifo"]},
+    {"display_name": "RTQ", "run_path": ["../../runs/rtq"]}
+  ]
+}

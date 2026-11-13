@@ -4,40 +4,102 @@ A standalone benchmark for evaluating learned, engine-agnostic workload manageme
 The goal with this benchmark is to compare scheduling policies and runtime predictors using different workload compositions. 
 Python 3.10+ is required.
 
-The implementation has three self-contained modules:
+The implementation has four self-contained modules:
 
 - [`src/wrk_gen`](src/wrk_gen): query grouping, runtime/CPU profiling, sampling and arrivals.
 - [`src/policies`](src/policies): online policy execution.
 - [`src/qpp`](src/qpp): model training, evaluation and TCP serving.
+- [`src/analysis`](src/analysis): workload and prediction analysis.
 
-## Quickstart
+## Setup
 
-Run from the repository root:
+The experiments run the same Docker image in two containers: one for Virtuoso and one for the workload manager. 
+Docker is required. 
+Run these commands from the repository root:
 
 ```bash
-./setup.sh
+docker build -f docker/virtuoso/Dockerfile -t blswm:latest docker/virtuoso
+docker network create virtuoso_net
+mkdir -p runs/virtuoso-db runs/virtuoso-import
+cp -n docker/virtuoso/virtuoso.ini runs/virtuoso.ini
+```
+
+### Database container
+
+`runs/virtuoso-db` is an example persistent database directory. Replace its host path with the directory containing your Virtuoso database if you already have one. The bundled [configuration](docker/virtuoso/virtuoso.ini) reproduces the live endpoint settings; adjust its copy at `runs/virtuoso.ini` for your available memory before starting the container. The `128g` memory and `26` CPU limits below are example values.
+
+```bash
+docker run -dit --name wikidata_virtuoso --network virtuoso_net \
+  --memory 128g --cpus 26 \
+  -v "$(pwd)/runs/virtuoso-db:/database" \
+  -v "$(pwd)/runs/virtuoso.ini:/database/virtuoso.ini:ro" \
+  -v "$(pwd)/runs/virtuoso-import:/import:ro" \
+  blswm:latest /bin/bash -c "cd /database && /opt/virtuoso-opensource/bin/virtuoso-t -c virtuoso.ini +foreground"
+```
+
+The database container retains its files in the mounted host directory. The manager reaches its endpoint at `http://wikidata_virtuoso:8890/sparql`. To expose it to the host as well, add `-p 127.0.0.1:8890:8890` to `docker run`.
+
+### Workload-manager container
+
+Start a second container on the same network, mounting this repository and the model data:
+
+```bash
+docker run -dit --name wrk_man --network virtuoso_net \
+  --memory 12g --cpus 12 \
+  -v "$(pwd):/blswm" -v /data:/data:ro -w /blswm \
+  blswm:latest /bin/bash
+docker exec -it wrk_man /bin/bash
+```
+
+Replace `/data` with the host directory containing the model data if needed. The bind mount exposes it read-only. In the workload-manager container, set up the repository environment:
+
+```bash
+./setup.sh --ml --analysis --java
 source .local/env.sh
 python -m wrk_gen --help
 python -m policies --help
 python -m qpp --help
+python -m analysis --help
 ```
 
-Setup creates or reuses `.venv/`, installs the package and test dependencies, and writes environment settings to `.local/env.sh`. Source that file in each new shell. Choose new output directories for each run. Workload profiling can also write to explicit paths such as `/data/temp/wiki_qc`.
-
-- `./setup.sh --ml --java` adds ML dependencies and builds query-graph extraction; requires Java 17 and Maven. PyTorch/DGL compatibility depends on your platform.
-- `PYTHON=python3.11 ./setup.sh` selects Python when creating the environment.
+`setup.sh` creates or reuses `.venv/` and writes `.local/env.sh`; source that file in each new shell. It requires Python 3.10+, Java 17 and Maven for `--java`. Use `--tune` to install Ray Tune, or `PYTHON=python3.11` to select Python when creating the environment. Choose new output directories under the repository; keep `/data` read-only.
 
 ## Data
 
-DBepdia and Wikidata RDF data can be downloaded via ...
-The RDF files can be loaded into any triplestore of choice.
-We use Virtuoso.
+In principle, any triplestore with a SPARQL endpoint can be used. 
+Our experiments use Virtuoso. 
+The [DBpedia 2016.10 file list](data/dbpedia2016/files.txt) contains the RDF downloads used for DBpedia. 
+For Wikidata, download the WDBench [truthy direct-properties RDF file](https://figshare.com/s/50b7544ad6b1f51de060), `truthy_direct_properties.nt.bz2`. 
+Keep the datasets in separate databases when reproducing experiments.
 
-The workload data and CQPP model data is available on this shared drive: [Google Drive](https://drive.google.com/drive/folders/10BAlgoJeQMEC4zmbD4Lsut6TVSTzmJZo?usp=sharing)
+For DBpedia, download the listed Turtle files into the import directory created during setup:
+
+```bash
+while IFS= read -r url; do
+  curl -fL "$url" -o "runs/virtuoso-import/$(basename "$url")" || break
+done < data/dbpedia2016/files.txt
+```
+
+Check that all listed files downloaded successfully.
+
+Once the database is ready, run `docker exec -it wikidata_virtuoso /opt/virtuoso-opensource/bin/isql 1111 dba dba` on the Docker host. In the SQL prompt, run the following for DBpedia; for Wikidata, replace `*.ttl.bz2` with `*.nt.bz2`:
+
+```sql
+ld_dir('/import', '*.ttl.bz2', 'http://localhost:8890/dataspace');
+rdf_loader_run();
+checkpoint;
+SELECT ll_file, ll_state, ll_error FROM DB.DBA.load_list;
+```
+
+Note, multiple ```rdf_loader_run();``` enables concurrent loading in Virtuoso.
+Check the load list for failures and use the appropriate endpoint host in the policy commands. 
+
+**The [shared drive](https://drive.google.com/drive/folders/10BAlgoJeQMEC4zmbD4Lsut6TVSTzmJZo?usp=sharing) contains trained CQPP models, workload executions, and query logs with runtime/CPU characterization.**
 
 ## Model serving
 
-Install the ML dependencies and build the graph extractor once with `./setup.sh --ml --java`. In each server terminal, run `source .local/env.sh`.
+Install the ML dependencies and build the engine-agnostic query plan constructor once with `./setup.sh --ml --java`. 
+In each server terminal, run `source .local/env.sh`.
 
 Run each server in its own terminal and leave it running during policy execution. Stop it with Ctrl+C. Both commands use CPU; use `--device cuda:0` for an available GPU.
 
@@ -177,10 +239,10 @@ Use `--format candidate` when the model predicts the incoming query's performanc
 python -m qpp dataset --workload data/test_wkl_short \
   --runs runs/dataset_fifo --format candidate --split train_validation \
   --validation-fraction 0.2 --threshold 120 --seed 42 \
-  --out /data/temp/wkl_temp/candidate_trainval
+  --out runs/datasets/candidate_trainval
 python -m qpp dataset --workload /path/to/test_workload \
   --runs runs/test_fifo_1 runs/test_fifo_2 --format candidate --split test \
-  --threshold 120 --out /data/temp/wkl_temp/candidate_test
+  --threshold 120 --out runs/datasets/candidate_test
 ```
 
 The training command writes `train.csv` and `val.csv` for DWNS, and `planrgcn_train.tsv` and `planrgcn_validation.tsv` for PlanRGCN. The test command combines all supplied runs into `test.csv` and `planrgcn_test.tsv`. CSV columns follow the incoming-query dataset format, including `Execution_Time`, `Running_Queries_At_Start` and `Queries_Started_During`. Set `RUNTIME_COL_NAME=Execution_Time` for the DWNS reader; the PlanRGCN TSV uses `mean_latency`. Start and end times are seconds relative to the run start. Resource measurements, query file names and measurement-coverage flags are blank when unavailable.
@@ -193,11 +255,11 @@ Use `--format queryset` when the model predicts performance for the candidate an
 python -m qpp dataset --workload data/test_wkl_short \
   --runs runs/dataset_fifo --format queryset --split train_validation \
   --validation-fraction 0.2 --sample-mode all_query_start_events \
-  --threshold 120 --seed 42 --out /data/temp/wkl_temp/queryset_trainval
+  --threshold 120 --seed 42 --out runs/datasets/queryset_trainval
 python -m qpp dataset --workload /path/to/test_workload \
   --runs runs/test_fifo_1 runs/test_fifo_2 --format queryset --split test \
   --sample-mode all_query_start_events --threshold 120 \
-  --out /data/temp/wkl_temp/queryset_test
+  --out runs/datasets/queryset_test
 ```
 
 The training command writes `train.jsonl` and `validation.jsonl`; the test command combines the supplied runs into `test.jsonl`. `--sample-mode all_query_start_events` samples each query start. `all_decision_events` also samples completions, and `aligned_hard_prefix` selects comparable cumulative hard-query cutpoints across runs. A single short trace may have only one hard-prefix value and therefore too few groups for a train/validation split; use multiple traces or start-event sampling.
@@ -213,8 +275,8 @@ For held-out evaluation, supply an independent test workload and its FIFO runs. 
 
 ```bash
 python -m qpp fit --model-type qsps \
-  --data /data/temp/wkl_temp/queryset_trainval/train.jsonl \
-  --validation /data/temp/wkl_temp/queryset_trainval/validation.jsonl \
+  --data runs/datasets/queryset_trainval/train.jsonl \
+  --validation runs/datasets/queryset_trainval/validation.jsonl \
   --featurizer /data/models/cqpp_wrk/queryset_cqpp_dataset_w1/run_queryset_joint_dwns_base_120/featurizer.pickle \
   --init-checkpoint /data/models/cqpp_wrk/queryset_cqpp_dataset_w1/run_queryset_joint_dwns_base_120/best_model.pt \
   --hidden-dim1 512 --hidden-dim2 128 --lstm-hidden-dim 64 --lstm-num-layers 2 \
@@ -238,8 +300,8 @@ For Ray Tune, install the optional dependency with `./setup.sh --ml --tune --jav
 
 ```bash
 python -m qpp tune --model-type qsps \
-  --data /data/temp/wkl_temp/queryset_trainval/train.jsonl \
-  --validation /data/temp/wkl_temp/queryset_trainval/validation.jsonl \
+  --data runs/datasets/queryset_trainval/train.jsonl \
+  --validation runs/datasets/queryset_trainval/validation.jsonl \
   --featurizer /data/models/cqpp_wrk/queryset_cqpp_dataset_w1/run_queryset_joint_dwns_base_120/featurizer.pickle \
   --search configs/qpp/search.json --samples 4 --cpus 2 \
   --cpus-per-trial 1 --max-concurrent-trials 2 \
@@ -259,6 +321,41 @@ python -m qpp evaluate --model-dir models/cqpp \
 ```
 
 
+## Workload and prediction analysis
+
+Install plotting dependencies with `./setup.sh --analysis` and source `.local/env.sh`. After running the FIFO and RTQ examples, supply paths and parameters directly:
+
+```bash
+python -m analysis prepare --runs runs/fifo runs/rtq --out runs/analysis_prepared
+python -m analysis workloads --prepared runs/analysis_prepared \
+  --run FIFO runs/fifo --run RTQ runs/rtq \
+  --reference FIFO --out runs/analysis_workloads
+python -m analysis predictions --data runs/datasets/queryset_test/test.jsonl \
+  --port 9010 --out runs/analysis_predictions
+```
+
+Repeat `--run NAME PATH` for each policy; give multiple paths after a name to average repeated executions per occurrence. `--metric` selects latency, waiting or execution time. To analyze an existing evaluation report, replace `--port 9010` with `--report reports/cqpp.json`; for a candidate classification CSV also provide `--thresholds 120`. `python -m analysis compare-predictions --results runs/predictions_qsps runs/predictions_dwns --out runs/model_comparison` compares model analyses made from the same labeled examples.
+
+The same operations can be configured in Python:
+
+```python
+from analysis import (PreparationConfig, WorkloadRunConfig, WorkloadAnalysisConfig,
+                      PredictionAnalysisConfig, PredictionComparisonConfig)
+
+PreparationConfig(["runs/fifo", "runs/rtq"], "runs/py_prepared").run()
+WorkloadAnalysisConfig("runs/py_prepared", [
+    WorkloadRunConfig("runs/fifo", "FIFO"),
+    WorkloadRunConfig("runs/rtq", "RTQ"),
+], "runs/py_workloads", reference="FIFO").run()
+PredictionAnalysisConfig("runs/datasets/queryset_test/test.jsonl",
+                         "runs/py_predictions", port=9010).run()
+PredictionComparisonConfig(["runs/predictions_qsps", "runs/predictions_dwns"],
+                           "runs/py_model_comparison").run()
+```
+
+Both interfaces generate PDF figures, LaTeX tables, CSV data and JSON metadata. 
+Results include S50 relative to the selected reference, backlog-weighted concurrency, classification recall/F1 and regression MAE/RMSE. 
+
 ## Query-log characterization and workload generation
 
 `python -m wrk_gen` characterizes query logs against a real endpoint, samples a workload composition, then assigns order and arrivals. Run from the repository root after `source .local/env.sh`. Each command has `--help`; choose new output directories. Characterization executes queries; grouping, sampling and arrival generation run offline.
@@ -271,7 +368,7 @@ Read `id`/`query_id` and `text`/`query_text`/`queryString` columns. This example
 python -m wrk_gen groups \
   --input /data/wkls/wikidata/qc/wikidata_ql.csv \
   --sample-size 20 --runtime-min 0.5 --runtime-max 2 \
-  --group-size 5 --seed 42 --out /data/temp/wiki_qc/groups
+  --group-size 5 --seed 42 --out runs/wiki_qc/groups
 ```
 
 Prior runtimes are optional. Filters recognize `runtime_seconds`, `isolated_runtime_s`, `ex time (secs)` or `mean_latency`; use `--runtime-column NAME` for another column. For a complete log without prior measurements, omit sampling and runtime filters:
@@ -279,7 +376,7 @@ Prior runtimes are optional. Filters recognize `runtime_seconds`, `isolated_runt
 ```bash
 python -m wrk_gen groups \
   --input /data/wkls/wikidata/qc/wikidata_ql.csv \
-  --group-size 100 --seed 42 --out /data/temp/wiki_qc/all_groups
+  --group-size 100 --seed 42 --out runs/wiki_qc/all_groups
 ```
 
 These are collection batches, separate from the runtime/CPU profile groups used for workload composition. Input query IDs must be unique. `groups.json` records the selection and batch hashes.
@@ -290,15 +387,15 @@ Install the OS package `collectl` locally and on the database host; remote colle
 
 ```bash
 python -m wrk_gen profile \
-  --groups /data/temp/wiki_qc/groups \
+  --groups runs/wiki_qc/groups \
   --endpoint http://wikidata_virtuoso:8890/sparql \
   --ssh-host wikidata_virtuoso --ssh-user root --ssh-ask-password \
-  --query-timeout 30 --repetitions 1 --out /data/temp/wiki_qc/profiles
+  --query-timeout 30 --repetitions 1 --out runs/wiki_qc/profiles
 ```
 
 `--groups` also accepts individual group directories. Queries run sequentially. Each group retains collectl raw logs, playback, database-process CPU/RSS samples and execution records. `catalog.csv` combines measured runtimes and peak CPU. Defaults use 1-ms CPU-counter sampling and 10-ms CPU windows (`100%` means one core); `--cpu-interval`, `--cpu-window` and `--collectl-interval` are configurable. CPU covers the database process, including background activity. Queries shorter than a complete CPU window have an unknown peak rather than an invented value. Prior runtime filters are selection criteria, not guarantees of new runtimes.
 
-Use `--groups /data/temp/wiki_qc/all_groups` in the profiling command to characterize the complete log. Database PID discovery requires a unique database process; select one with `--pid` when necessary. `--repetitions` controls executions per query and `--query-gap` controls spacing. Across repetitions, catalog runtime is averaged and peak CPU is the maximum available peak. The catalog also contains mean CPU, peak RSS, status and measurement settings. Failed executions stop profiling and are recorded in the manifest. Keep `catalog.csv` beside its collection manifest for timeout screening, and use consistent CPU windows when comparing or combining catalogs.
+Use `--groups runs/wiki_qc/all_groups` in the profiling command to characterize the complete log. Database PID discovery requires a unique database process; select one with `--pid` when necessary. `--repetitions` controls executions per query and `--query-gap` controls spacing. Across repetitions, catalog runtime is averaged and peak CPU is the maximum available peak. The catalog also contains mean CPU, peak RSS, status and measurement settings. Failed executions stop profiling and are recorded in the manifest. Keep `catalog.csv` beside its collection manifest for timeout screening, and use consistent CPU windows when comparing or combining catalogs.
 
 ### 3. Sample a frozen workload bag
 
@@ -306,11 +403,11 @@ Choose the source CSV with `--input`, define query groups by runtime/CPU bounds 
 
 ```bash
 python -m wrk_gen sample \
-  --input /data/temp/wiki_qc/profiles/catalog.csv \
+  --input runs/wiki_qc/profiles/catalog.csv \
   --profiles configs/workloads/profiles_short.json \
   --group subsecond=10 --group moderate=10 \
   --name short_20 --dataset wikidata --seed 42 \
-  --reuse distinct_only --screen-timeouts --out /data/temp/wiki_qc/bag
+  --reuse distinct_only --screen-timeouts --out runs/wiki_qc/bag
 ```
 
 `profiles_short.json` defines `subsecond` as runtime below 1 second and `moderate` as 1–30 seconds. Edit the bounds or supply another profiles file. Sampling deduplicates exact query texts, assigns distinct texts across overlapping groups, and preserves source IDs and measurements. `--reuse prefer_distinct` fills shortages with balanced repeated occurrences; `--reuse distinct_only` rejects shortages. Each occurrence gets its own ID. `--exclude` accepts training-query CSVs. `--screen-timeouts` excludes timeout/partial observations and runtimes at recorded collection deadlines; it requires collection manifests for usable observations.
@@ -358,21 +455,21 @@ All patterns reuse the same frozen bag. Sampling, ordering (`--order-seed`) and 
 These commands use the two groups in the 20-query example above. P2 and P3 explicitly select `moderate` for a short live run; dataset scenarios can instead select their recorded `H_M` and `V100` groups.
 
 ```bash
-python -m wrk_gen arrivals --bag /data/temp/wiki_qc/bag \
+python -m wrk_gen arrivals --bag runs/wiki_qc/bag \
   --pattern P1 --rate 10 --order-seed 202 --arrival-seed 303 \
-  --out /data/temp/wiki_qc/P1
-python -m wrk_gen arrivals --bag /data/temp/wiki_qc/bag \
+  --out runs/wiki_qc/P1
+python -m wrk_gen arrivals --bag runs/wiki_qc/bag \
   --pattern P2 --heavy-profile moderate --background-profile subsecond \
   --rate 10 --bursts 2 --burst-count 5 --background-counts 5 5 \
   --burst-window 0.05 --order-seed 202 --arrival-seed 303 \
-  --out /data/temp/wiki_qc/P2
-python -m wrk_gen arrivals --bag /data/temp/wiki_qc/bag \
+  --out runs/wiki_qc/P2
+python -m wrk_gen arrivals --bag runs/wiki_qc/bag \
   --pattern P3 --long-profile moderate --long-count 10 \
   --fast-profile subsecond --fast-count 10 --rate 10 --burst-window 0.05 \
-  --order-seed 202 --arrival-seed 303 --out /data/temp/wiki_qc/P3
-python -m wrk_gen arrivals --bag /data/temp/wiki_qc/bag \
+  --order-seed 202 --arrival-seed 303 --out runs/wiki_qc/P3
+python -m wrk_gen arrivals --bag runs/wiki_qc/bag \
   --pattern P4 --phase-counts 6 8 6 --phase-rates 10 20 10 \
-  --order-seed 202 --arrival-seed 303 --out /data/temp/wiki_qc/P4
+  --order-seed 202 --arrival-seed 303 --out runs/wiki_qc/P4
 ```
 
 To reproduce a dataset scenario, pass its JSON file with `--scenario /path/to/P2/config.json` instead of supplying individual options. 

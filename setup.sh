@@ -9,12 +9,13 @@ build_java=false
 for option in "$@"; do
   case "$option" in
     --ml) extras+=,ml ;;
+    --analysis) extras+=,analysis ;;
     --tune) extras+=,tune ;;
     --java) build_java=true ;;
     -h|--help)
-      printf '%s\n' 'Usage: ./setup.sh [--ml] [--tune] [--java]' \
+      printf '%s\n' 'Usage: ./setup.sh [--ml] [--analysis] [--tune] [--java]' \
         'Creates/reuses .venv and installs the package plus test dependencies.' \
-        '--ml: install ML extras; --tune: install Ray Tune; --java: build graph extractor.' \
+        '--ml: install ML extras; --analysis: install plotting; --tune: install Ray Tune; --java: build graph extractor.' \
         'Requires Python 3.10+ (override with PYTHON); --java requires Java 17 and Maven.' \
         'After setup, run: source .local/env.sh'
       exit 0 ;;
